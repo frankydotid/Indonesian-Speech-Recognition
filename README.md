@@ -1,12 +1,10 @@
-=====================================================================
-README
-=====================================================================
+# README
 
-I. DESCRIPTION
+## I. DESCRIPTION
 This is a repository for my Speech Recognition class using HTK and
 Festival for Indonesian language. 
 
-II. SPEECH RECOGNITION
+## II. SPEECH RECOGNITION
 I used HTK for speech recognition task that can be downloaded from
 http://htk.eng.cam.ac.uk/. You may need the manual (HTK Book) and
 you also may want to start from Chapter 3 Tutorial if you are only
@@ -22,7 +20,7 @@ for the details.
 The best results is 90% (18 out of 20 sentences) after some 
 tweaking with major help from my professor.
 
-III. SPEECH SYNTHESIS
+## III. SPEECH SYNTHESIS
 Speech synthesis was performed using Festival and Mbrola voice
 database, since Festival does not provide Indonesian voice. The 
 Indonesian voice database in Mbrola was created by Arry Akhmad Arman
@@ -36,7 +34,7 @@ because I cannot find any other scm file for Indonesian.
 The result is still poor, mainly due to intonation and accent
 rule, which is none.
 
-IV. DISCLAIMER
+## IV. DISCLAIMER
 This is a school project, do not use it for any important task. I
 do not responsible for the undesired results of using the data 
 provided here.
