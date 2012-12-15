@@ -1,0 +1,418 @@
+=====================================================================
+Speech Synthesis - Festival
+=====================================================================
+20121215
+- Finish modifying cz2_mbrola.scm to id1_mbrola.scm. 
+- The results are poor in intonation and accent. Not enough time to
+  define the rules.
+
+20121214
+- How to run mbrola
+	mbrola id1 i_am_working.pho output.wav
+
+- Using Festival:
+	- copy id1 to /usr/share/festival/voices/indonesian/id1_mbrola/
+	- need to create a wrapper for mbrola file used, copy from czech:
+		 /usr/share/festival/voices/indonesian/id1_mbrola/festvox
+		 /id1_mbrola.scm
+	- duration and lts rule done. Need to look at the tree.
+	
+
+20121212
+- Festival installation completed last week
+- Try to read a tutorial and run the festival:
+	- Encountered an error: festival exiting to shell after SayText
+		command. Try to figure out the problem and the solution.
+		- H0: Something to do with the sound driver ALSA? and can
+			be fixed by putting the right thing inside festival.scm?
+			It's in /usr/share/festival/festival.scm, not in the etc,
+			because when I changed the name of the file in etc,
+			nothing happened. But when I changed the name in usr/share
+			, festival reported an error
+		- Solution: looks like the festival.scm in etc is still 
+			needed. I commented out two commands:
+				(Parameter.set 'Audio_Command "aplay -q -c 1 -t raw -f s16 -r $SR $FILE")
+				(Parameter.set 'Audio_Method 'Audio_Command)
+			inside the /usr/share/festival/festival.scm and /etc/
+			festival.scm. Commenting one of them would not work,
+			you need to comment both commands in both files.
+			Source: http://comments.gmane.org/gmane.science.tts.festival/3573
+	- Try to install new voices:	
+		- Ref: http://ubuntuforums.org/showthread.php?t=751169
+		- Indonesian: http://indotts.melsa.net.id/
+		- MBROLA: http://tcts.fpms.ac.be/synthesis/mbrola/mbrcopybin.html
+		- 
+
+
+=====================================================================
+ Speech Recognition - HTK
+=====================================================================
+=====================================================================
+ Directories
+=====================================================================
+scripts/
+	Makefile: to run the training and test
+	get_random_sentences.pl: get random sentences from list of 
+								sentence
+	monophones_to_mff.pl: create hmmdefs for hmm4
+	produce_sentences.pl: add S00X to sentence, read from standard
+							input
+	remove_punct_and_lc.pl: remove punctuation and do lowercasing,
+								read from standard input
+	to_mlf.pl: read from standard input, convert list of sentences
+				to mlf format
+	uppercase_and_uniq.pl: read from standard input, print uniq
+							words (to make dictionary)
+	wav_mfc_list.pl: create .scp file, pair of wav and mfc file
+	word_to_phonemes.pl: read from standard input, output phonemes
+							for a given word
+	word_to_phonemes_2.pl: read from standard input, output phonemes
+							for a given sentence
+train/
+	0001/: Standard training based on tutorial. Also include 
+			additional hmms10 and hmms11, by running the
+			herest two more times (20121126). Tested on [test/0000,
+			test/0001, test/0002, test/0003, test/0005].
+	0002/: Modified 'dict', to include 'sil' after each word, this
+			is one of the effort to improve the accuracy of the
+			recognition that produce error of insertion when
+			there is a silence between two words. The training
+			were repeated only on 'aligning' step (see tutorial),
+			when producing hmms8 and hmms9 (20121118). Tested on
+			[test/0002].
+	0003/: Extend signal coding by cepstral mean substraction
+			(MFCC...._Z) (20121126). Tested on [test/0004].
+	0004/: A copy of 0003, modifying config.0 and config.1 by
+			setting parameter 'ENORMALISE=T'. Tested on test/0006
+			
+test/
+	0000/: Standard test data, with old grammatics
+	0001/: Standard test data.
+	0002/: Test data with dictionary added with words ended with 
+			'sil', and grammatics changed to include 'SILENCE'
+	0003/: From different speakers (the wife)
+	0004/: Config to use "MFCC_0_D_A_Z"
+	0005/: Phonetic loop, double columns of phonemes only in
+			test/data/dict.
+	0006/: Config to use "MFCC_0_D_A_Z", "ENORMALISE=T"
+	0007/: Copy from test/0005, use phonemes as wdnet (ERROR)
+
+======================================================================
+ Notes
+======================================================================
+20121130/20121201/20121205
+- Try using ENORMALISE=T, train/0004, test/0006
+	- Edit codetr.scp, train.scp, codete.scp, test.scp to use new
+		directories
+	- hcopy-train:
+	- hcompv:
+	- create macros file manually (see 20121126)
+	- herest1
+	- open hmms/hmm4:
+		- copy all sil model, add at the bottom
+		- change 'sil' to 'sp'
+		- change number of states to 3
+		- delete state 2 and 4
+		- change state number to 2
+		- replace transp with:
+			<TRANSP> 3
+			 0.0 1.0 0.0
+			 0.0 0.9 0.1
+			 0.0 0.0 0.0
+	- hhed
+	- herest2, hvite-align, herest3
+	- hcopy-test, hvite-recognize (-p 0.0), hresults
+	- 85%, no improvement, so:
+		- Edit in test/0006:
+			MATIKAN m a a t i i k a n sp
+			NYALAKAN ny a l a a k a n sp
+		- 90% (done)
+		- also works for (train/0003, test/0004)
+		
+- Phonetic Loop 
+	- Change test data only: in test/0005
+	- Add hbuild in Makefile
+	- Create double columns of phonemes in dict
+	- Create testref.mlf for phonetic loop
+		- copy dict from test/0004 data/, rename as dict.ref
+		- rename testref.mlf as testref.mlf.ref
+		- copy mkphones0.led as expand.led, keep 'EX', 'DE SP'
+		- go to data/, run:
+			HLEd -l '*' -d dict.ref -i testref.mlf expand.led 
+				testref.mlf.ref
+	- Run hresults
+
+- Phonetic Loop with Language Model (test/0005)
+	- Install speech tools: sudo apt-get install speech-tools (done)
+		- ngram_build --help
+	
+	- Prepare sentences (sentences.list.txt)
+		- Take list of sentences from thesis
+		- get sentence part only, remove all words that contain
+			numbers, remove all punctuations, remove short 
+			sentences (<2 words) (sentences.list)
+		- clean sentences.list manually (there is this NUL)??
+	
+	- Words to phonemes 2 (sentences.phonemes)
+		- Impossible to write right now
+			- Exception list: too many english words, but almost
+				all of them have low frequencies, so ignore
+			- Rule: too many variations
+		- Run from scripts/:
+			cat ../test/0007/data/sentences.list | perl word_to_phonemes_2.pl > ../test/0007/data/sentences.phonemes
+	
+	- Create word list (phonemes.list):
+		- Run:
+			cat sentences.phonemes | sed -e 's/\s/\n/g' | grep -v '^$' | sort | uniq > phonemes.txt
+		- NUL problem, clean up manually
+		- rename to phonemes.list
+		- add "sil"
+	
+	- ngram_build:
+		- Run:
+			ngram_build sentences.phonemes -o sentences.ngram -w phonemes.list -smooth 1 -default_tags  -otype htk_ascii -trace
+		- Adding: !ENTER and !EXIT in phonemes.list or HBuild
+			returns error
+		- HBuild -m sentences.ngram phonemes.list wdnet
+		
+	- HVite (ERROR):
+		ERROR [+8231]  GetHCIModel: Cannot find hmm [???-]!ENTER[+???]
+		FATAL ERROR - Terminating program HVite
+		
+	- No ENTER and EXIT in hmmdefs?
+		Solution: put "!ENTER sil" and "!EXIT sil" in dictionary for
+		test. (Done)
+	
+	- A little bit of improvement from test/0005
+
+20121126
+- Try to improve the accuracy:
+	- Run the HMM 2 more times (get HMM11) in train 0001
+		- worse: 65%
+		- Get 85% by using HMM8,7 (smaller than HMM9)
+	X Increase training sentences
+	X Use headset
+	- Extend signal coding by cepstral mean substraction (MFCC...._Z)
+	  to decrease influence of background noise 
+		- train 0003, test 0004, 85%
+		- change proto, config.0 and config.1 to use MFCC_0_D_A_Z
+		- run make hcompv
+			- create macros file manually
+				- macros:
+					- copy content of vFloors, add before content 
+					(prepend):
+						~o 
+						<VecSize> 39
+						<MFCC_0_D_A_Z> 
+			- hmmdefs
+				- perl monophones_to_mff.pl $(TRAINDIR)
+		- copy hmmdefs from hmm3 and add sp model to hmm4/hmmdefs
+		- create sil.hed to add transitions and tied state
+		- copy macros from hmm3 to hmm4
+		- run until hrest3
+		- hcopy-test : because using new MFCC
+			using test 0004: new mfc file
+			modify the config.0, config.1
+		- try using dict0: no sp, using no SILENCE in gram: test 0004
+		
+20121118
+- Test the Makefile
+
+- Different results of recognition, 75 instead of 80 percent
+	- 75% when test/data/dict contains word with sp at the end
+	- 80% when test/data/dict contains word with no sp at the end
+	- test/0001, changing -p to -50 add 5% accuracy, accuracy is now 80%
+	
+- Archive previous folder structure as Experiment0
+	- some .scp file may have not been edited yet and refer to incorrect path
+
+- Test the old (lempar jalan) test prompts: works fine, still 90%
+
+- Let us train with:
+	- adding two type of pronounciation in dictionary, one with sp and one with sil at the end, put in train\0002
+	- retrain from alignment step (hvite-align), using hmm7
+		- run HERest twice to produce hmm9
+	- Put the test in test/0002, dict added with sil model and gram added with SILENCE, produce new wdnet using hparse
+	- Test them: poor results, only 65%. 
+		- With p -50.0, insertion error decreased, but add 1 error to deletion
+		- With p 0.0, insertion error is higher
+	- So '-p' is important
+
+- Let us use different speakers:
+	- 20 sentences in test/0003
+	- hmm model: train/0001
+	- results: 20%
+
+- Reading how to make a better grammar: HParse
+	- cannot limit how many times a word is repeated
+
+- Wrong phonemes transcription of AC (a s eg, should be a s ey)
+
+
+
+20121117
+- Modify the folder structures
+
+20121111
+- Change the grammatics
+- Poorer results on sentence: 80%
+
+20121107
+- Adding: "silence sil" to dict, needed for aligning data
+- Run:
+	HVite -l '*' -o WST -b silence -C config -a -H hmms/hmm7/macros -H hmms/hmm7/hmmdefs -i data/aligned.mlf -m -t 250.0 -y lab -I data/words.mlf -S config/train.scp data/dict data/monophones1
+- Run for hmm8 and hmm9, change phones1.mlf to aligned.mlf:
+	- ERROR [+6510]  LOpen: Unable to open label file /mnt/hgfs/02 Charles University/03 Materials/01 Winter/Fundamentals of Speech Recognition/Experiment/mfc/S0006.lab
+		- HVite delete my S0006.lab
+			- try to add S0006.lab manually: done
+
+	HERest -C config/config.1 -I data/aligned.mlf -t 250.0 150.0 1000.0 -S config/train.scp -H hmms/hmm7/macros -H hmms/hmm7/hmmdefs -M hmms/hmm8 data/monophones1
+	HERest -C config/config.1 -I data/aligned.mlf -t 250.0 150.0 1000.0 -S config/train.scp -H hmms/hmm8/macros -H hmms/hmm8/hmmdefs -M hmms/hmm9 data/monophones1
+
+- Grammatics, Wdnet, generate test data, create dict.test: dictionary for all words in test data
+- Generate test data
+- Recording: 20 sentences
+- Create the mfc with config.0 
+	HCopy -T 1 -C config/config.0 -S config/codete.scp 
+- Let us test without tiedlist:
+	- HVite -H hmms/hmm9/macros -H hmms/hmm9/hmmdefs -S config/test.scp -l '*' -i test/recout.mlf -w data/wdnet -p 0.0 -s 5.0 data/dict.test 	
+		- ERROR [+7060]  InitHMMSet: Expected newline after 1'th HMM
+		- ERROR [+3228]  Initialise: MakeHMMSet failed
+		Fail, I think I need hmmlist (tiedlist) file. What is it?, maybe this "http://www.sp.nitech.ac.jp/~ri/julius-dev/doxygen/julius/4.0/en/rdhmmlist_8c.html". 
+		Sol: Try using monophones1 as hmmlist. I think it works.
+			HVite -H hmms/hmm9/macros -H hmms/hmm9/hmmdefs -S config/test.scp -l '*' -i test/recout.mlf -w data/wdnet -p 0.0 -s 5.0 data/dict.test data/monophones1
+- Evaluate:
+	- Create testref.mlf using codes/to_mlf.pl, format input per line: S000X WORD1 WORD2 ....
+	- HResults -I data/testref.mlf config/hmmlist test/recout.mlf
+====================== HTK Results Analysis =======================
+  Date: Wed Nov  7 22:31:38 2012
+  Ref : data/testref.mlf
+  Rec : test/recout.mlf
+------------------------ Overall Results --------------------------
+SENT: %Correct=90.00 [H=18, S=2, N=20]
+WORD: %Corr=98.64, Acc=98.64 [H=218, D=2, S=1, I=0, N=221]
+===================================================================
+
+	
+
+20121104
+- Creating Monophone HMMs
+	- Monophone: single phone. Pronunciation of a word is given as a series symbols that correspond to the individual units of sound, e.g. 
+		- Monophone: TRANSLATE [TRANSLATE] t r @ n s l e t
+		- Triphone: TRANSLATE [TRANSLATE] t+r t-r+@ r-@+n @-n+s n-s+l s-l+e l-e+t e-t
+	- Single Gaussian monophone HMM
+		- Flat Start Monophones: 
+			- Prototype model, parameters are not important, only to define model topology
+			- Let's try:
+				- create file proto in config/proto, create hmms/hmm0 folder
+				- config/config.0: to create first mfc
+				- config/config.1: to be used in creating first hmm (hmm0)
+				- config/train.scp: 
+					cat codetr.scp | perl -e 'while(<>) {chomp;my ($wav, $mfc) = split /\"\s\"/;print "\"".$mfc."\n";}' > train.scp
+				- run
+					- 1.Error
+						ERROR [+6251]  Input file is not in RIFF format
+						ERROR [+6213]  OpenWaveInput: Get[format]HeaderInfo failed
+						ERROR [+6313]  OpenAsChannel: OpenWaveInput failed
+						ERROR [+6316]  OpenBuffer: OpenAsChannel failed
+						ERROR [+2050]  LoadFile: Config parameters invalid
+					  Solution: error caused by line "SOURCEFORMAT = WAV" in config.1 file. Since the wav (RIFF) file had been converted to mfc file before, maybe we should consider it as HTK file and remove that line. (http://www.compapp.dcu.ie/~john/CA461archive2002December.txt)
+					- 2.Error again (different error)
+						ERROR [+6350]  CloseBuffer: Crc error
+						FATAL ERROR - Terminating program HCompV
+						http://wenku.baidu.com/view/da1fbcd5360cba1aa811da6a.html###
+						Maybe the mfc is damaged, try to re-create mfc files.
+					  Solution: recreate MFC with config.0 "TARGETKIND = MFCC_0_D_A", previously "TARGETKIND = MFCC_0". Since, config.1 use the first targetkind, the mfc must be created with the same targetkind. ????
+					- 3.Success: proto and vFloors created.
+						HCompV -C config/config.1 -f 0.01 -m -S config/train.scp -M hmms/hmm0 config/proto
+				- create hmmdefs file, the MMF (Master Macro File)
+					- macros: manual copy
+					- hmmdefs: Copy proto for each monophone: done, using perl
+				- run for hmm1 (need to create the folder manually: hmm0, hmm1, hmm2, hmm3)
+					HERest -C config/config.1 -I data/phones0.mlf -t 250.0 150.0 1000.0 -S config/train.scp -H hmms/hmm0/macros -H hmms/hmm0/hmmdefs -M hmms/hmm1 data/monophones0
+						WARNING [-7032]  OWarn: change HMM Set covKind in HERest
+						Pruning-On[250.0 150.0 1000.0]
+						 WARNING [-2331]  UpdateModels: q[16] copied: only 0 egs
+						 in HERest
+						 WARNING [-2331]  UpdateModels: x[23] copied: only 0 egs
+						 in HERest
+						 WARNING [-2331]  UpdateModels: z[25] copied: only 0 egs
+						 in HERest
+						 WARNING [-2331]  UpdateModels: kh[30] copied: only 0 egs
+						 in HERest
+						 WARNING [-2331]  UpdateModels: oi[33] copied: only 0 egs
+						 in HERest
+						 WARNING [-2331]  UpdateModels: sy[34] copied: only 0 egs
+						 in HERest
+
+					- hmmdefs and macros created
+				- run for hmm2 and hmm3: done
+		- Fixing silence models
+			- http://www.voxforge.org/home/dev/acousticmodels/linux/create/htkjulius/tutorial/monophones/step-7
+			- copy hmmdefs from hmm3 and add sp model to hmm4/hmmdefs
+			- create sil.hed to add transitions and tied state
+			- copy macros from hmm3 to hmm4
+			- add hmm5, hmm6, hmm7 manually
+			- modify using HHEd
+				HHEd -H hmms/hmm4/macros -H hmms/hmm4/hmmdefs -M hmms/hmm5 config/sil.hed data/monophones1
+			- create phones1.mlf
+				HLEd -l '*' -d data/dict -i data/phones1.mlf config/mkphones1.led data/words.mlf
+			- re-estimate to hmm6 and hmm7
+				HERest -C config/config.1 -I data/phones1.mlf -t 250.0 150.0 1000.0 -S config/train.scp -H hmms/hmm5/macros -H hmms/hmm5/hmmdefs -M hmms/hmm6 data/monophones1
+				HERest -C config/config.1 -I data/phones1.mlf -t 250.0 150.0 1000.0 -S config/train.scp -H hmms/hmm6/macros -H hmms/hmm6/hmmdefs -M hmms/hmm7 data/monophones1
+		- Realigning training data: needed?
+			- add hmm8, hmm9
+			- wait, ask
+				
+				
+- SOX
+	
+
+20121028
+- Try to use HSLab:
+	- InitAudi: Cannot open OSS audio device /dev/dsp
+	- http://wiki.debian.org/SoundFAQ
+		- might need to install apt-get install oss-compat
+	- try to install: not working
+	- try alsa-oss: https://help.ubuntu.com/community/alsa-oss
+		run it like: working
+			aoss HSLab noname
+	- test recording: done
+	- replay: FAIL
+		- SetVol: unable to set OSS mixer volume
+- Try to open WAV file using HSLab: fail
+	- HSLab accepts what input?
+	
+- To Do:
+	+ Record 50 sentences in WAV using Audacity
+		+ S0001.wav - S0050.wav
+	+ Provide label file, one for each wav:
+		- S0001.lab - S0050.lab
+		- No, all already in the MLF file. MLF file is used to not having a single .lab file for each wav.
+	+ Create mlf file
+	+ Dictionary for phonemes
+		- Code: word to phoneme, phoneme list (with sp) http://www.omniglot.com/writing/indonesian.htm
+		- NETBOOK n e t b u k
+		- LAPTOP l e p t o p
+		- FILM f i l e m
+		- DESAIN d i s ai n
+		- AKHIRNYA a k h i r ny a
+		- ey (adegan) and eg (beberapa) manually assigned
+		- Add:
+			SENT-END [] sil
+			SENT-START [] sil
+	+ MLF file for phonemes
+	+ Create mfc file from WAV
+		- create config file: copy and paste from book
+		- list of wav and mfc file as in the book
+		- SOURCEFORMAT = WAV added to config to handle error: cannot read HTK header
+		- Next error: "SaveBuffer: cannot create file mfc/S0001.mfc"
+			- wrong folder name
+
+20121026
+- Record 50 sentences using Audacity, 16Khz, 16Bit, WAV file
+- Create unique words from the sentences
+- Create words.mlf
+- Question:
+	- what is ".lab" format
+
